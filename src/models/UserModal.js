@@ -1,6 +1,6 @@
-const mongoose = require("mongoose");
-const validator = require("validator");
-const bcrypt = require("bcrypt");
+import mongoose from 'mongoose'
+import validator from 'validator'
+import bcrypt from 'bcryptjs'
 
 const UserSchema = new mongoose.Schema(
   {
@@ -26,6 +26,7 @@ const UserSchema = new mongoose.Schema(
     password: {
       type: String,
       required: true,
+      select: false,
       validate(value) {
         if (!validator.isStrongPassword(value)) {
           throw new Error("Enter a strong Password");
@@ -72,4 +73,4 @@ UserSchema.methods.toPublicJSON = function () {
 };
 
 const User = mongoose.model("User", UserSchema);
-module.exports = User;
+export default User

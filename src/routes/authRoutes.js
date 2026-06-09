@@ -1,5 +1,5 @@
 const express = require("express");
-const User = require("../modals/UserModal");
+const User = require("../models/UserModal");
 const {
   generateToken,
   authenticate,
