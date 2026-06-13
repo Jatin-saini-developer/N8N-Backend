@@ -1,16 +1,14 @@
 import jwt from 'jsonwebtoken'
-import User from '../../models/User.model.js'
-import ApiError from '../../utils/ApiError.js'
-import { config } from '../../config/env.js'
+import User from '../models/UserModal.js'
+import ApiError from '../utils/ApiError.js'
 
 const generateToken = (userId) => {
   return jwt.sign(
     { id: userId },
-    config.jwtSecret,
-    { expiresIn: config.jwtExpiresIn }
+    process.env.JWT_SECRET,
+    { expiresIn: process.env.JWT_EXPIRES_IN }
   )
 }
-
 export const registerService = async ({ name, email, password }) => {
   // Check if user already exists
   const existingUser = await User.findOne({ email })

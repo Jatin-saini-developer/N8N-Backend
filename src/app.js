@@ -42,13 +42,27 @@ app.get('/health', (req, res) => {
 })
 
 // ─── Routes ──────────────────────────────────────────────────────────
-// yahan baad mein routes add karenge
+// ─── Routes ──────────────────────────────────────────────────────────
+import authRoutes from './modules/authRoutes.js'
+
+app.use('/api/v1/auth', authRoutes)
 
 // ─── 404 Handler ─────────────────────────────────────────────────────
 app.use((req, res) => {
   res.status(404).json({
     success: false,
     message: `Route ${req.originalUrl} not found`,
+  })
+})
+
+app.use((err, req, res, next) => {
+  const statusCode = err.statusCode || 500
+  const message = err.message || 'Something went wrong'
+
+  return res.status(statusCode).json({
+    success: false,
+    message,
+    errors: err.errors || [],
   })
 })
 

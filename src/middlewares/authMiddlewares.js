@@ -1,8 +1,7 @@
 import jwt from 'jsonwebtoken'
-import User from '../models/User.model.js'
+import User from '../models/UserModal.js'
 import ApiError from '../utils/ApiError.js'
 import asyncHandler from '../utils/asyncHandler.js'
-import { config } from '../config/env.js'
 
 const authMiddleware = asyncHandler(async (req, res, next) => {
   let token
@@ -18,7 +17,7 @@ const authMiddleware = asyncHandler(async (req, res, next) => {
     throw new ApiError(401, 'Access denied. No token provided')
   }
 
-  const decoded = jwt.verify(token, config.jwtSecret)
+  const decoded = jwt.verify(token, process.env.JWT_SECRET)
 
   const user = await User.findById(decoded.id)
 
