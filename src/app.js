@@ -3,6 +3,7 @@ import cors from 'cors'
 import helmet from 'helmet'
 import morgan from 'morgan'
 import rateLimit from 'express-rate-limit'
+import logger from './config/logger.js'
 
 const app = express()
 
@@ -31,7 +32,12 @@ app.use(express.json({ limit: '10kb' }))
 app.use(express.urlencoded({ extended: true, limit: '10kb' }))
 
 // ─── Logging ─────────────────────────────────────────────────────────
-app.use(morgan('dev'))
+app.use(morgan('combined', {
+  stream: {
+    write: (message) => logger.http(message.trim())
+  },
+  skip: () => process.env.NODE_ENV === 'production'
+}))
 
 // ─── Health Check ────────────────────────────────────────────────────
 app.get('/health', (req, res) => {
@@ -44,8 +50,10 @@ app.get('/health', (req, res) => {
 // ─── Routes ──────────────────────────────────────────────────────────
 // ─── Routes ──────────────────────────────────────────────────────────
 import authRoutes from './modules/authRoutes.js'
+import workflowRoutes from './modules/workflow/workflowRoutes.js'
 
 app.use('/api/v1/auth', authRoutes)
+app.use('/api/v1/workflows', workflowRoutes)
 
 // ─── 404 Handler ─────────────────────────────────────────────────────
 app.use((req, res) => {
