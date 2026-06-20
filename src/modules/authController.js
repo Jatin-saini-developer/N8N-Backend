@@ -29,3 +29,12 @@ export const getMe = asyncHandler(async (req, res) => {
     })
   )
 })
+
+export const logout = asyncHandler(async (req, res) => {
+  // JWT is stateless — the client discards the token.
+  // This endpoint exists as a clean API contract and can be
+  // extended later to blacklist tokens or log audit events.
+  return res.status(200).json(
+    new ApiResponse(200, 'Logged out successfully')
+  )
+})
