@@ -25,13 +25,34 @@ const UserSchema = new mongoose.Schema(
     },
     password: {
       type: String,
-      required: true,
+      // required: true HATA DIYA — ab function hai:
+      required: function () {
+        // sirf "local" (normal) users ke liye password required hai
+        return this.authProvider === 'local'
+      },
       select: false,
       validate(value) {
-        if (!validator.isStrongPassword(value)) {
+        // sirf tab validate karo jab password diya gaya ho
+        // (Google users ke liye yeh skip ho jaayega)
+        if (value && !validator.isStrongPassword(value)) {
           throw new Error("Enter a strong Password");
         }
       },
+    },
+    authProvider: {
+      type: String,
+      enum: ['local', 'google'],
+      default: 'local',
+    },
+    googleId: {
+      type: String,
+      default: null,
+      // sparse: true zaroori hai — kyunki normal users
+      // ke paas googleId nahi hoga (null), aur MongoDB
+      // unique index pe multiple nulls allow nahi karta
+      // sparse ke bina
+      unique: true,
+      sparse: true,
     },
     role: {
       type: String,
@@ -53,11 +74,18 @@ const UserSchema = new mongoose.Schema(
 );
 
 UserSchema.pre("save", async function () {
-  if (!this.isModified("password")) return;
+  // password sirf tab hash karo jab woh exist kare
+  // aur modify hua ho — Google users ke liye
+  // password hi nahi hoga, toh yeh skip ho jaayega
+  if (!this.isModified("password") || !this.password) return;
   this.password = await bcrypt.hash(this.password, 10);
 });
 
 UserSchema.methods.comparePassword = async function (candidatePassword) {
+  // agar user ke paas password hi nahi hai (Google user),
+  // toh comparison fail kar do — woh normal login
+  // use nahi kar sakta
+  if (!this.password) return false
   return await bcrypt.compare(candidatePassword, this.password);
 };
 
@@ -67,6 +95,7 @@ UserSchema.methods.toPublicJSON = function () {
     name: this.name,
     email: this.email,
     role: this.role,
+    authProvider: this.authProvider,
     createdAt: this.createdAt,
   };
 };

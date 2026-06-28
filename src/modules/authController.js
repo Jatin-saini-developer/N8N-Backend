@@ -1,6 +1,6 @@
 import asyncHandler from '../utils/asyncHandler.js'
 import ApiResponse from '../utils/ApiResponse.js'
-import { registerService, loginService } from './authService.js'
+import { registerService, loginService, googleAuthService } from './authService.js'
 
 export const register = asyncHandler(async (req, res) => {
   const { name, email, password } = req.body
@@ -19,6 +19,20 @@ export const login = asyncHandler(async (req, res) => {
 
   return res.status(200).json(
     new ApiResponse(200, 'Login successful', data)
+  )
+})
+
+export const googleAuth = asyncHandler(async (req, res) => {
+  const { idToken } = req.body
+
+  if (!idToken) {
+    throw new ApiError(400, 'Google ID token is required')
+  }
+
+  const data = await googleAuthService({ idToken })
+
+  return res.status(200).json(
+    new ApiResponse(200, 'Google authentication successful', data)
   )
 })
 
