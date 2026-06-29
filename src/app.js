@@ -4,6 +4,8 @@ import helmet from 'helmet'
 import morgan from 'morgan'
 import rateLimit from 'express-rate-limit'
 import logger from './config/logger.js'
+import integrationsRoutes from './modules/integrations/integrationsRoutes.js'
+
 
 const app = express()
 
@@ -54,6 +56,8 @@ import workflowRoutes from './modules/workflow/workflowRoutes.js'
 
 app.use('/api/v1/auth', authRoutes)
 app.use('/api/v1/workflows', workflowRoutes)
+app.use('/api/v1/integrations', integrationsRoutes)
+
 
 // ─── 404 Handler ─────────────────────────────────────────────────────
 app.use((req, res) => {
