@@ -237,24 +237,45 @@ export const executeWorkflowService = async ({
   triggerData,
 }) => {
   // ── 1. Load workflow + ownership check ──────────────────────────────────
+  logger.debug(`[EXEC-TRACE] ──── STAGE 1: LOAD WORKFLOW ────`)
+  logger.debug(`[EXEC-TRACE] Looking up workflow: ${workflowId}`)
   const workflow = await Workflow.findById(workflowId)
 
   if (!workflow) {
+    logger.debug(`[EXEC-TRACE] ✘ Workflow not found: ${workflowId}`)
     throw new ApiError(404, 'Workflow not found')
   }
 
+  logger.debug(`[EXEC-TRACE] ✔ Workflow loaded: name="${workflow.name}", status="${workflow.status}", nodeCount=${workflow.nodeCount}`)
+
   if (workflow.userId.toString() !== userId.toString()) {
+    logger.debug(`[EXEC-TRACE] ✘ Ownership mismatch: workflow.userId=${workflow.userId}, request.userId=${userId}`)
     throw new ApiError(403, 'You do not have permission to execute this workflow')
   }
+  logger.debug(`[EXEC-TRACE] ✔ Ownership verified`)
 
   // ── 2. Load nodes and edges ─────────────────────────────────────────────
+  logger.debug(`[EXEC-TRACE] ──── STAGE 2: LOAD WORKFLOW DATA ────`)
   const workflowData = await WorkflowData.findOne({ workflowId: workflow._id })
 
   if (!workflowData || workflowData.nodes.length === 0) {
+    logger.debug(`[EXEC-TRACE] ✘ No nodes found — workflowData exists: ${!!workflowData}, nodeCount: ${workflowData?.nodes?.length ?? 0}`)
     throw new ApiError(400, 'Workflow has no nodes to execute')
   }
 
+  logger.debug(`[EXEC-TRACE] ✔ WorkflowData loaded — ${workflowData.nodes.length} nodes, ${workflowData.edges.length} edges`)
+  logger.debug(`[EXEC-TRACE] Node types: ${workflowData.nodes.map(n => `${n.id}(${n.type})`).join(' → ')}`)
+  logger.debug(`[EXEC-TRACE] Edges: ${workflowData.edges.map(e => `${e.source}→${e.target}`).join(', ')}`)
+  // Log each node's data keys to spot missing config
+  workflowData.nodes.forEach(n => {
+    logger.debug(`[EXEC-TRACE]   Node ${n.id} (${n.type}): data keys = ${n.data ? Object.keys(n.data).join(', ') : 'NO DATA'}`)
+    if (n.data) {
+      logger.debug(`[EXEC-TRACE]   Node ${n.id} data: ${JSON.stringify(n.data)}`)
+    }
+  })
+
   // ── 3. Create Execution document ────────────────────────────────────────
+  logger.debug(`[EXEC-TRACE] ──── STAGE 3: CREATE EXECUTION DOCUMENT ────`)
   const execution = await Execution.create({
     workflowId: workflow._id,
     userId,
@@ -267,26 +288,48 @@ export const executeWorkflowService = async ({
       status: 'pending',
     })),
   })
+  logger.debug(`[EXEC-TRACE] ✔ Execution document created: ${execution._id}`)
+  logger.debug(`[EXEC-TRACE] Steps initialized: ${execution.steps.map(s => `${s.nodeId}(${s.nodeType}:${s.status})`).join(', ')}`)
 
   logger.info(`Execution started: ${execution._id} for workflow: ${workflowId} by user: ${userId}`)
 
   // ── 4. Run the engine ───────────────────────────────────────────────────
+  logger.debug(`[EXEC-TRACE] ──── STAGE 4: CALL WORKFLOW EXECUTOR ────`)
   const context = {
     workflowId: workflowId.toString(),
     userId: userId.toString(),
     executionId: execution._id.toString(),
     triggerPayload: triggerData,
   }
+  logger.debug(`[EXEC-TRACE] Engine context: ${JSON.stringify(context)}`)
 
   let result
   try {
+    logger.debug(`[EXEC-TRACE] Calling executeWorkflow()...`)
     result = await executeWorkflow({
       nodes: workflowData.nodes,
       edges: workflowData.edges,
       context,
     })
+    logger.debug(`[EXEC-TRACE] ✔ Engine returned — status=${result.status}, totalNodes=${result.totalNodes}, success=${result.successfulNodes}, failed=${result.failedNodes}, skipped=${result.skippedNodes}`)
+    logger.debug(`[EXEC-TRACE] Engine duration: ${result.duration}ms`)
+    if (result.error) {
+      logger.debug(`[EXEC-TRACE] Engine error field: ${result.error}`)
+    }
+    // Log each node result from the engine
+    if (result.nodeResults) {
+      result.nodeResults.forEach((nr, i) => {
+        logger.debug(`[EXEC-TRACE]   nodeResult[${i}]: id=${nr.nodeId}, type=${nr.nodeType}, status=${nr.status}, msg="${nr.message || 'N/A'}", duration=${nr.duration}ms`)
+        if (nr.error) {
+          logger.debug(`[EXEC-TRACE]   nodeResult[${i}] error: ${nr.error}`)
+        }
+      })
+    }
   } catch (error) {
     // Engine threw unexpectedly — mark execution as failed
+    logger.debug(`[EXEC-TRACE] ✘ Engine threw exception: ${error.message}`)
+    logger.debug(`[EXEC-TRACE] Error name: ${error.name}, code: ${error.code || 'N/A'}`)
+    logger.debug(`[EXEC-TRACE] Stack: ${error.stack}`)
     execution.status = 'failed'
     execution.error = error.message
     execution.completedAt = new Date()
@@ -298,9 +341,11 @@ export const executeWorkflowService = async ({
   }
 
   // ── 5. Persist results ──────────────────────────────────────────────────
+  logger.debug(`[EXEC-TRACE] ──── STAGE 5: PERSIST RESULTS ────`)
   execution.status = result.status === 'success' ? 'completed' : 'failed'
   execution.completedAt = new Date()
   execution.durationMs = execution.completedAt - execution.startedAt
+  logger.debug(`[EXEC-TRACE] Execution final status: ${execution.status}`)
 
   // Update each step with the executor's result
   if (result.nodeResults && result.nodeResults.length > 0) {
@@ -314,6 +359,9 @@ export const executeWorkflowService = async ({
         step.logs = [
           nodeResult.message || `${nodeResult.nodeType} node ${nodeResult.status}`,
         ]
+        logger.debug(`[EXEC-TRACE]   Step ${step.nodeId} → ${step.status} (${step.durationMs}ms) — log: "${step.logs[0]}"`)
+      } else {
+        logger.debug(`[EXEC-TRACE]   ⚠ No step found for nodeResult.nodeId=${nodeResult.nodeId}`)
       }
     }
 
@@ -321,11 +369,13 @@ export const executeWorkflowService = async ({
     for (const step of execution.steps) {
       if (step.status === 'pending') {
         step.status = 'skipped'
+        logger.debug(`[EXEC-TRACE]   Step ${step.nodeId} → skipped (was still pending)`)
       }
     }
   }
 
   await execution.save()
+  logger.debug(`[EXEC-TRACE] ✔ Execution document saved`)
 
   logger.info(
     `Execution completed: ${execution._id} — status=${execution.status} ` +

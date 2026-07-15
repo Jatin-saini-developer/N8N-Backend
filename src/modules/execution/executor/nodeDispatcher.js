@@ -41,16 +41,35 @@ const executors = {
  * @throws {Error} if the node type has no registered executor
  */
 export async function dispatch(node, context) {
+  console.log(`[EXEC-TRACE] [nodeDispatcher] Dispatching node ${node.id} (type="${node.type}")`)
+  console.log(`[EXEC-TRACE] [nodeDispatcher]   Node data keys: ${node.data ? Object.keys(node.data).join(', ') : 'NO DATA'}`)
+  console.log(`[EXEC-TRACE] [nodeDispatcher]   Node data: ${JSON.stringify(node.data)}`)
+
   const executor = executors[node.type]
 
   if (!executor) {
+    console.log(`[EXEC-TRACE] [nodeDispatcher]   ✘ No executor for type "${node.type}" — registered: ${Object.keys(executors).join(', ')}`)
     throw new Error(
       `No executor registered for node type "${node.type}" (node ${node.id}). ` +
       `Registered types: ${Object.keys(executors).join(', ')}`
     )
   }
 
-  return executor.execute(node, context)
+  console.log(`[EXEC-TRACE] [nodeDispatcher]   ✔ Executor found for "${node.type}" — calling execute()...`)
+
+  const startTime = Date.now()
+  try {
+    const result = await executor.execute(node, context)
+    console.log(`[EXEC-TRACE] [nodeDispatcher]   ✔ Executor returned in ${Date.now() - startTime}ms — status=${result.status}`)
+    return result
+  } catch (error) {
+    console.log(`[EXEC-TRACE] [nodeDispatcher]   ✘ Executor threw in ${Date.now() - startTime}ms — ${error.name}: ${error.message}`)
+    console.log(`[EXEC-TRACE] [nodeDispatcher]   Error code: ${error.code || 'N/A'}`)
+    if (error.meta) {
+      console.log(`[EXEC-TRACE] [nodeDispatcher]   Error meta: ${JSON.stringify(error.meta)}`)
+    }
+    throw error
+  }
 }
 
 /**

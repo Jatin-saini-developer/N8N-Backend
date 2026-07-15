@@ -926,6 +926,12 @@ async function dispatchGitHubApi(plan, log) {
  * @returns {Promise<object>} standardised execution result
  */
 export async function execute(node, context) {
+  console.log(`[EXEC-TRACE] [githubExecutor] ──── GITHUB EXECUTOR ────`)
+  console.log(`[EXEC-TRACE] [githubExecutor] Node: ${node?.id}, type: ${node?.type}`)
+  console.log(`[EXEC-TRACE] [githubExecutor] Action: ${node?.data?.action || 'NO ACTION'}`)
+  console.log(`[EXEC-TRACE] [githubExecutor] Node data: ${JSON.stringify(node?.data)}`)
+  console.log(`[EXEC-TRACE] [githubExecutor] Context userId: ${context?.userId}, workflowId: ${context?.workflowId}`)
+
   // Create the structured log collector for this run
   const log = new ExecutionLog('github', node?.id ?? 'unknown')
 
@@ -945,7 +951,9 @@ export async function execute(node, context) {
     log.info('api', `Dispatching GitHub API action: "${plan.action}"`)
     const apiResult = await dispatchGitHubApi(plan, log)
 
-    // ── Success result ────────────────────────────────────────────────────
+    // ── Success result ────────────────────────────────────────────────
+    console.log(`[EXEC-TRACE] [githubExecutor] ✔ GitHub action "${plan.actionLabel}" completed successfully`)
+    console.log(`[EXEC-TRACE] [githubExecutor] API calls made: ${log._apiRequests.length}, warnings: ${log._warnings.length}`)
     return log.finalize('success', `GitHub action "${plan.actionLabel}" completed successfully.`, {
       nodeId: node.id,
       action: plan.action,
@@ -960,6 +968,10 @@ export async function execute(node, context) {
     })
   } catch (error) {
     // ── Record the failure in the log ──────────────────────────────────────
+    console.log(`[EXEC-TRACE] [githubExecutor] ✘ FAILED: [${error.code || 'UNKNOWN'}] ${error.message}`)
+    if (error.meta) {
+      console.log(`[EXEC-TRACE] [githubExecutor] Error meta: ${JSON.stringify(error.meta)}`)
+    }
     log.error('result', `Execution failed: [${error.code || 'UNKNOWN'}] ${error.message}`, {
       errorCode: error.code || 'UNKNOWN',
       errorName: error.name,

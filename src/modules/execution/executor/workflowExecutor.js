@@ -51,15 +51,28 @@ export async function executeWorkflow({ nodes, edges, context }) {
 
   try {
     // ── 1. Compute execution order via graphTraversal ──────────────────────
+    console.log(`[EXEC-TRACE] [workflowExecutor] ──── GRAPH TRAVERSAL ────`)
+    console.log(`[EXEC-TRACE] [workflowExecutor] Input: ${nodes.length} nodes, ${edges.length} edges`)
     const orderedNodes = getExecutionOrder(nodes, edges)
+    console.log(`[EXEC-TRACE] [workflowExecutor] ✔ Traversal complete — execution order: ${orderedNodes.map(n => `${n.id}(${n.type})`).join(' → ')}`)
 
     // ── 2. Execute nodes sequentially ─────────────────────────────────────
-    for (const node of orderedNodes) {
+    console.log(`[EXEC-TRACE] [workflowExecutor] ──── SEQUENTIAL EXECUTION ────`)
+    for (let idx = 0; idx < orderedNodes.length; idx++) {
+      const node = orderedNodes[idx]
+      console.log(`[EXEC-TRACE] [workflowExecutor] ── Node [${idx + 1}/${orderedNodes.length}]: id=${node.id}, type=${node.type}`)
       try {
+        console.log(`[EXEC-TRACE] [workflowExecutor]   Dispatching to nodeDispatcher...`)
         const result = await dispatch(node, context)
+        console.log(`[EXEC-TRACE] [workflowExecutor]   ✔ Node ${node.id} completed: status=${result.status}, msg="${result.message || 'N/A'}", duration=${result.duration}ms`)
         nodeResults.push(result)
       } catch (error) {
         // ── 3. On failure — record the failed node and stop ───────────────
+        console.log(`[EXEC-TRACE] [workflowExecutor]   ✘ Node ${node.id} FAILED: ${error.message}`)
+        console.log(`[EXEC-TRACE] [workflowExecutor]   Error name: ${error.name}, code: ${error.code || 'N/A'}`)
+        if (error.executionResult) {
+          console.log(`[EXEC-TRACE] [workflowExecutor]   Executor returned structured result — logs.totalFailures=${error.executionResult?.logs?.totalFailures}`)
+        }
         nodeResults.push({
           nodeId: node.id,
           nodeType: node.type,
@@ -76,6 +89,7 @@ export async function executeWorkflow({ nodes, edges, context }) {
         // Remaining nodes are skipped — count them
         const executedCount = nodeResults.length
         const skippedCount = orderedNodes.length - executedCount
+        console.log(`[EXEC-TRACE] [workflowExecutor]   Stopping execution — ${executedCount - 1} succeeded, 1 failed, ${skippedCount} skipped`)
 
         return {
           status: ExecutionStatus.FAILED,
@@ -93,6 +107,7 @@ export async function executeWorkflow({ nodes, edges, context }) {
 
     // ── 4. All nodes succeeded ────────────────────────────────────────────
     const finishedAt = new Date()
+    console.log(`[EXEC-TRACE] [workflowExecutor] ✔ All ${orderedNodes.length} nodes succeeded in ${finishedAt - startedAt}ms`)
 
     return {
       status: ExecutionStatus.SUCCESS,
@@ -108,6 +123,8 @@ export async function executeWorkflow({ nodes, edges, context }) {
   } catch (error) {
     // ── 5. Graph traversal itself failed (invalid workflow) ───────────────
     const finishedAt = new Date()
+    console.log(`[EXEC-TRACE] [workflowExecutor] ✘ GRAPH TRAVERSAL FAILED: ${error.message}`)
+    console.log(`[EXEC-TRACE] [workflowExecutor] Error code: ${error.code || 'N/A'}`)
 
     return {
       status: ExecutionStatus.FAILED,

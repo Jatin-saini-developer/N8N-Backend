@@ -17,6 +17,11 @@
  * @returns {Promise<object>} execution result
  */
 export async function execute(node, context) {
+  console.log(`[EXEC-TRACE] [triggerExecutor] ──── TRIGGER EXECUTOR ────`)
+  console.log(`[EXEC-TRACE] [triggerExecutor] Node: ${node.id}`)
+  console.log(`[EXEC-TRACE] [triggerExecutor] Context.workflowId: ${context.workflowId}`)
+  console.log(`[EXEC-TRACE] [triggerExecutor] Context.triggerPayload: ${JSON.stringify(context.triggerPayload)}`)
+
   const startedAt = new Date()
 
   // Simulate minimal processing delay (1–5 ms)
@@ -24,7 +29,7 @@ export async function execute(node, context) {
 
   const finishedAt = new Date()
 
-  return {
+  const result = {
     nodeId: node.id,
     nodeType: node.type,
     status: 'success',
@@ -33,4 +38,7 @@ export async function execute(node, context) {
     finishedAt,
     duration: finishedAt - startedAt,
   }
+
+  console.log(`[EXEC-TRACE] [triggerExecutor] ✔ Trigger complete — duration=${result.duration}ms`)
+  return result
 }

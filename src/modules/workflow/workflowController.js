@@ -1,5 +1,6 @@
 import asyncHandler from '../../utils/asyncHandler.js'
 import ApiResponse from '../../utils/ApiResponse.js'
+import logger from '../../config/logger.js'
 import {
   createWorkflowService,
   getAllWorkflowsService,
@@ -126,11 +127,25 @@ export const updateWorkflowStatus = asyncHandler(async (req, res) => {
 export const executeWorkflowHandler = asyncHandler(async (req, res) => {
   const { triggerData } = req.body
 
+  // ── [EXEC-TRACE] Request received ──────────────────────────────────────────
+  logger.debug(`[EXEC-TRACE] ──── REQUEST RECEIVED ────`)
+  logger.debug(`[EXEC-TRACE] Endpoint: POST /workflows/${req.params.id}/execute`)
+  logger.debug(`[EXEC-TRACE] User ID: ${req.user._id}`)
+  logger.debug(`[EXEC-TRACE] Workflow ID param: ${req.params.id}`)
+  logger.debug(`[EXEC-TRACE] triggerData: ${JSON.stringify(triggerData, null, 2)}`)
+  logger.debug(`[EXEC-TRACE] Body keys: ${Object.keys(req.body).join(', ')}`)
+
   const execution = await executeWorkflowService({
     workflowId: req.params.id,
     userId: req.user._id,
     triggerData,
   })
+
+  // ── [EXEC-TRACE] Response sent ──────────────────────────────────────────────
+  logger.debug(`[EXEC-TRACE] ──── RESPONSE SENT ────`)
+  logger.debug(`[EXEC-TRACE] Execution status: ${execution.status}`)
+  logger.debug(`[EXEC-TRACE] Execution ID: ${execution.executionId}`)
+  logger.debug(`[EXEC-TRACE] Duration: ${execution.durationMs}ms`)
 
   return res.status(201).json(
     new ApiResponse(201, 'Workflow execution completed', { execution })
