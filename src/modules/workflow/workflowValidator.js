@@ -109,3 +109,29 @@ export const updateStatusValidator = [
     .isIn(['draft', 'active', 'paused'])
     .withMessage('Status must be draft, active or paused'),
 ]
+
+export const executeWorkflowValidator = [
+  param('id')
+    .isMongoId()
+    .withMessage('Invalid workflow ID'),
+
+  body('triggerData.name')
+    .trim()
+    .notEmpty()
+    .withMessage('New developer name is required')
+    .isLength({ max: 100 })
+    .withMessage('Name cannot exceed 100 characters'),
+
+  body('triggerData.email')
+    .trim()
+    .notEmpty()
+    .withMessage('New developer email is required')
+    .isEmail()
+    .withMessage('Email must be a valid email address'),
+
+  body('triggerData.githubUsername')
+    .optional()
+    .trim()
+    .isLength({ max: 39 })
+    .withMessage('GitHub username cannot exceed 39 characters'),
+]

@@ -7,6 +7,7 @@ import {
   updateWorkflowService,
   deleteWorkflowService,
   updateWorkflowStatusService,
+  executeWorkflowService,
 } from './workflowService.js'
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -115,5 +116,23 @@ export const updateWorkflowStatus = asyncHandler(async (req, res) => {
 
   return res.status(200).json(
     new ApiResponse(200, `Workflow status updated to ${status}`, { workflow })
+  )
+})
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  EXECUTE WORKFLOW
+//  POST /api/v1/workflows/:id/execute
+// ─────────────────────────────────────────────────────────────────────────────
+export const executeWorkflowHandler = asyncHandler(async (req, res) => {
+  const { triggerData } = req.body
+
+  const execution = await executeWorkflowService({
+    workflowId: req.params.id,
+    userId: req.user._id,
+    triggerData,
+  })
+
+  return res.status(201).json(
+    new ApiResponse(201, 'Workflow execution completed', { execution })
   )
 })

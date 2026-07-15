@@ -1,8 +1,10 @@
 import mongoose from 'mongoose'
 import Workflow from '../../models/Workflow.model.js'
 import WorkflowData from '../../models/WorkflowData.model.js'
+import Execution from '../../models/Execution.model.js'
 import ApiError from '../../utils/ApiError.js'
 import logger from '../../config/logger.js'
+import { executeWorkflow } from '../execution/executor/workflowExecutor.js'
 
 // ─────────────────────────────────────────────────────────────────────────────
 //  CREATE WORKFLOW
@@ -219,4 +221,132 @@ export const updateWorkflowStatusService = async ({
   logger.info(`Workflow status updated: ${workflowId} → ${status} by user: ${userId}`)
 
   return workflow
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  EXECUTE WORKFLOW
+//  — Load workflow + nodes/edges
+//  — Create Execution document (status: running)
+//  — Call workflowExecutor engine
+//  — Persist result back to Execution document
+//  — Ownership check mandatory
+// ─────────────────────────────────────────────────────────────────────────────
+export const executeWorkflowService = async ({
+  workflowId,
+  userId,
+  triggerData,
+}) => {
+  // ── 1. Load workflow + ownership check ──────────────────────────────────
+  const workflow = await Workflow.findById(workflowId)
+
+  if (!workflow) {
+    throw new ApiError(404, 'Workflow not found')
+  }
+
+  if (workflow.userId.toString() !== userId.toString()) {
+    throw new ApiError(403, 'You do not have permission to execute this workflow')
+  }
+
+  // ── 2. Load nodes and edges ─────────────────────────────────────────────
+  const workflowData = await WorkflowData.findOne({ workflowId: workflow._id })
+
+  if (!workflowData || workflowData.nodes.length === 0) {
+    throw new ApiError(400, 'Workflow has no nodes to execute')
+  }
+
+  // ── 3. Create Execution document ────────────────────────────────────────
+  const execution = await Execution.create({
+    workflowId: workflow._id,
+    userId,
+    status: 'running',
+    triggerData,
+    startedAt: new Date(),
+    steps: workflowData.nodes.map((node) => ({
+      nodeId: node.id,
+      nodeType: node.type,
+      status: 'pending',
+    })),
+  })
+
+  logger.info(`Execution started: ${execution._id} for workflow: ${workflowId} by user: ${userId}`)
+
+  // ── 4. Run the engine ───────────────────────────────────────────────────
+  const context = {
+    workflowId: workflowId.toString(),
+    userId: userId.toString(),
+    executionId: execution._id.toString(),
+    triggerPayload: triggerData,
+  }
+
+  let result
+  try {
+    result = await executeWorkflow({
+      nodes: workflowData.nodes,
+      edges: workflowData.edges,
+      context,
+    })
+  } catch (error) {
+    // Engine threw unexpectedly — mark execution as failed
+    execution.status = 'failed'
+    execution.error = error.message
+    execution.completedAt = new Date()
+    execution.durationMs = execution.completedAt - execution.startedAt
+    await execution.save()
+
+    logger.error(`Execution failed: ${execution._id} — ${error.message}`)
+    throw new ApiError(500, 'Workflow execution failed unexpectedly')
+  }
+
+  // ── 5. Persist results ──────────────────────────────────────────────────
+  execution.status = result.status === 'success' ? 'completed' : 'failed'
+  execution.completedAt = new Date()
+  execution.durationMs = execution.completedAt - execution.startedAt
+
+  // Update each step with the executor's result
+  if (result.nodeResults && result.nodeResults.length > 0) {
+    for (const nodeResult of result.nodeResults) {
+      const step = execution.steps.find((s) => s.nodeId === nodeResult.nodeId)
+      if (step) {
+        step.status = nodeResult.status === 'success' ? 'success' : 'failed'
+        step.startedAt = nodeResult.startedAt
+        step.completedAt = nodeResult.finishedAt
+        step.durationMs = nodeResult.duration
+        step.logs = [
+          nodeResult.message || `${nodeResult.nodeType} node ${nodeResult.status}`,
+        ]
+      }
+    }
+
+    // Mark remaining pending steps as skipped
+    for (const step of execution.steps) {
+      if (step.status === 'pending') {
+        step.status = 'skipped'
+      }
+    }
+  }
+
+  await execution.save()
+
+  logger.info(
+    `Execution completed: ${execution._id} — status=${execution.status} ` +
+    `duration=${execution.durationMs}ms`
+  )
+
+  return {
+    executionId: execution._id,
+    workflowId: workflow._id,
+    status: execution.status,
+    triggerData: execution.triggerData,
+    steps: execution.steps,
+    startedAt: execution.startedAt,
+    completedAt: execution.completedAt,
+    durationMs: execution.durationMs,
+    error: execution.error,
+    summary: {
+      totalNodes: result.totalNodes,
+      successfulNodes: result.successfulNodes,
+      failedNodes: result.failedNodes,
+      skippedNodes: result.skippedNodes,
+    },
+  }
 }
