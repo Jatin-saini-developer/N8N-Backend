@@ -936,6 +936,21 @@ export async function execute(node, context) {
   const log = new ExecutionLog('github', node?.id ?? 'unknown')
 
   try {
+    // ── Inject username from trigger payload (runtime value) ────────────
+    // The username is NOT stored on the node — it comes from the trigger
+    // data at execution time (who to onboard). This keeps the node config
+    // about *what* to do and the trigger about *who* to do it for.
+    if (!node.data.username && context.triggerPayload) {
+      if (context.triggerPayload.githubUsername) {
+        node.data.username = context.triggerPayload.githubUsername
+        console.log(`[EXEC-TRACE] [githubExecutor] Injected username from triggerPayload.githubUsername: "${node.data.username}"`)
+      } else if (context.triggerPayload.email) {
+        // Fallback — GitHub accepts email for org invitations
+        node.data.username = context.triggerPayload.email
+        console.log(`[EXEC-TRACE] [githubExecutor] Injected username from triggerPayload.email fallback: "${node.data.username}"`)
+      }
+    }
+
     // ── Validation pipeline ───────────────────────────────────────────────
     validateNodeConfig(node, log)
     validateContext(context, node.id, log)
