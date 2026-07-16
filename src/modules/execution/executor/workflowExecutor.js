@@ -56,6 +56,12 @@ export async function executeWorkflow({ nodes, edges, context }) {
     const orderedNodes = getExecutionOrder(nodes, edges)
     console.log(`[EXEC-TRACE] [workflowExecutor] ✔ Traversal complete — execution order: ${orderedNodes.map(n => `${n.id}(${n.type})`).join(' → ')}`)
 
+    // [NODE-TRACE] Stage 6: log orderedNodes with complete data
+    console.log(`[NODE-TRACE] [6/8 workflowExecutor] orderedNodes (${orderedNodes.length}):`)
+    orderedNodes.forEach((n, i) => {
+      console.log(`[NODE-TRACE] [6/8 workflowExecutor] orderedNodes[${i}]:`, JSON.stringify({ id: n.id, type: n.type, data: n.data }, null, 2))
+    })
+
     // ── 2. Execute nodes sequentially ─────────────────────────────────────
     console.log(`[EXEC-TRACE] [workflowExecutor] ──── SEQUENTIAL EXECUTION ────`)
     for (let idx = 0; idx < orderedNodes.length; idx++) {

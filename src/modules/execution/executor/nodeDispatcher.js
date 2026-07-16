@@ -41,6 +41,9 @@ const executors = {
  * @throws {Error} if the node type has no registered executor
  */
 export async function dispatch(node, context) {
+  // [NODE-TRACE] Stage 7: log complete node received by dispatcher
+  console.log(`[NODE-TRACE] [7/8 nodeDispatcher] Node received:`, JSON.stringify({ id: node.id, type: node.type, data: node.data }, null, 2))
+
   console.log(`[EXEC-TRACE] [nodeDispatcher] Dispatching node ${node.id} (type="${node.type}")`)
   console.log(`[EXEC-TRACE] [nodeDispatcher]   Node data keys: ${node.data ? Object.keys(node.data).join(', ') : 'NO DATA'}`)
   console.log(`[EXEC-TRACE] [nodeDispatcher]   Node data: ${JSON.stringify(node.data)}`)

@@ -305,6 +305,14 @@ export const executeWorkflowService = async ({
 
   let result
   try {
+    // [NODE-TRACE] Stage 5: Nodes being passed to workflowExecutor
+    const ghNodes5 = workflowData.nodes.filter(n => n.type === 'github')
+    console.log(`[NODE-TRACE] [5/8 executeWorkflowService] Passing ${workflowData.nodes.length} nodes to executor. GitHub: ${ghNodes5.length}`)
+    ghNodes5.forEach(n => {
+      console.log(`[NODE-TRACE] [5/8 executeWorkflowService] GitHub node:`, JSON.stringify({ id: n.id, type: n.type, data: n.data }, null, 2))
+    })
+    console.log(`[NODE-TRACE] [5/8 executeWorkflowService] ALL nodes:`, JSON.stringify(workflowData.nodes.map(n => ({ id: n.id, type: n.type, data: n.data })), null, 2))
+
     logger.debug(`[EXEC-TRACE] Calling executeWorkflow()...`)
     result = await executeWorkflow({
       nodes: workflowData.nodes,

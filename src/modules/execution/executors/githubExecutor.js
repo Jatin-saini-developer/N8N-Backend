@@ -926,6 +926,11 @@ async function dispatchGitHubApi(plan, log) {
  * @returns {Promise<object>} standardised execution result
  */
 export async function execute(node, context) {
+  // [NODE-TRACE] Stage 8: log complete node object before validation
+  console.log(`[NODE-TRACE] [8/8 githubExecutor] COMPLETE NODE OBJECT:`, JSON.stringify({ id: node?.id, type: node?.type, data: node?.data, position: node?.position }, null, 2))
+  console.log(`[NODE-TRACE] [8/8 githubExecutor] data.action = ${JSON.stringify(node?.data?.action)}`)
+  console.log(`[NODE-TRACE] [8/8 githubExecutor] data keys = ${node?.data ? Object.keys(node.data).join(', ') : 'NO DATA'}`)
+
   console.log(`[EXEC-TRACE] [githubExecutor] ──── GITHUB EXECUTOR ────`)
   console.log(`[EXEC-TRACE] [githubExecutor] Node: ${node?.id}, type: ${node?.type}`)
   console.log(`[EXEC-TRACE] [githubExecutor] Action: ${node?.data?.action || 'NO ACTION'}`)
