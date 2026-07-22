@@ -5,6 +5,7 @@ import Execution from '../../models/Execution.model.js'
 import ApiError from '../../utils/ApiError.js'
 import logger from '../../config/logger.js'
 import { executeWorkflow } from '../execution/executor/workflowExecutor.js'
+import { migrateNodes, WorkflowMigrationError } from '../../utils/workflowMigrator.js'
 
 // ─────────────────────────────────────────────────────────────────────────────
 //  CREATE WORKFLOW
@@ -102,9 +103,11 @@ export const getWorkflowService = async ({ workflowId, userId }) => {
     workflowId: workflow._id,
   }).select('-__v -workflowId')
 
+  const migratedNodes = migrateNodes(workflowData?.nodes || [])
+
   return {
     ...workflow.toObject(),
-    nodes: workflowData?.nodes || [],
+    nodes: migratedNodes,
     edges: workflowData?.edges || [],
   }
 }
@@ -263,11 +266,22 @@ export const executeWorkflowService = async ({
     throw new ApiError(400, 'Workflow has no nodes to execute')
   }
 
-  logger.debug(`[EXEC-TRACE] ✔ WorkflowData loaded — ${workflowData.nodes.length} nodes, ${workflowData.edges.length} edges`)
-  logger.debug(`[EXEC-TRACE] Node types: ${workflowData.nodes.map(n => `${n.id}(${n.type})`).join(' → ')}`)
+  // Pure in-memory migration of legacy nodes
+  let migratedNodes
+  try {
+    migratedNodes = migrateNodes(workflowData.nodes)
+  } catch (migErr) {
+    if (migErr instanceof WorkflowMigrationError) {
+      throw new ApiError(400, `Workflow migration failed: ${migErr.message}`)
+    }
+    throw migErr
+  }
+
+  logger.debug(`[EXEC-TRACE] ✔ WorkflowData loaded — ${migratedNodes.length} nodes, ${workflowData.edges.length} edges`)
+  logger.debug(`[EXEC-TRACE] Node types: ${migratedNodes.map(n => `${n.id}(${n.type})`).join(' → ')}`)
   logger.debug(`[EXEC-TRACE] Edges: ${workflowData.edges.map(e => `${e.source}→${e.target}`).join(', ')}`)
   // Log each node's data keys to spot missing config
-  workflowData.nodes.forEach(n => {
+  migratedNodes.forEach(n => {
     logger.debug(`[EXEC-TRACE]   Node ${n.id} (${n.type}): data keys = ${n.data ? Object.keys(n.data).join(', ') : 'NO DATA'}`)
     if (n.data) {
       logger.debug(`[EXEC-TRACE]   Node ${n.id} data: ${JSON.stringify(n.data)}`)
@@ -282,7 +296,7 @@ export const executeWorkflowService = async ({
     status: 'running',
     triggerData,
     startedAt: new Date(),
-    steps: workflowData.nodes.map((node) => ({
+    steps: migratedNodes.map((node) => ({
       nodeId: node.id,
       nodeType: node.type,
       status: 'pending',
@@ -305,17 +319,9 @@ export const executeWorkflowService = async ({
 
   let result
   try {
-    // [NODE-TRACE] Stage 5: Nodes being passed to workflowExecutor
-    const ghNodes5 = workflowData.nodes.filter(n => n.type === 'github')
-    console.log(`[NODE-TRACE] [5/8 executeWorkflowService] Passing ${workflowData.nodes.length} nodes to executor. GitHub: ${ghNodes5.length}`)
-    ghNodes5.forEach(n => {
-      console.log(`[NODE-TRACE] [5/8 executeWorkflowService] GitHub node:`, JSON.stringify({ id: n.id, type: n.type, data: n.data }, null, 2))
-    })
-    console.log(`[NODE-TRACE] [5/8 executeWorkflowService] ALL nodes:`, JSON.stringify(workflowData.nodes.map(n => ({ id: n.id, type: n.type, data: n.data })), null, 2))
-
     logger.debug(`[EXEC-TRACE] Calling executeWorkflow()...`)
     result = await executeWorkflow({
-      nodes: workflowData.nodes,
+      nodes: migratedNodes,
       edges: workflowData.edges,
       context,
     })

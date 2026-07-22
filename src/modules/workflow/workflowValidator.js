@@ -1,4 +1,5 @@
 import { body, param } from 'express-validator'
+import { backendBindings } from '../../registry/bindings.js'
 
 export const createWorkflowValidator = [
   body('name')
@@ -63,7 +64,7 @@ export const updateWorkflowValidator = [
 
   body('nodes.*.type')
     .if(body('nodes').exists())
-    .isIn(['trigger', 'github', 'slack', 'jira', 'notion'])
+    .isIn(backendBindings.getValidSchemaTypeIds())
     .withMessage('Invalid node type'),
 
   body('nodes.*.position.x')

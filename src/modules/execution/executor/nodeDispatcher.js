@@ -15,22 +15,7 @@
  * No changes required in workflowExecutor.js.
  */
 
-import * as triggerExecutor from '../executors/triggerExecutor.js'
-import * as githubExecutor from '../executors/githubExecutor.js'
-import * as slackExecutor from '../executors/slackExecutor.js'
-import * as jiraExecutor from '../executors/jiraExecutor.js'
-import * as notionExecutor from '../executors/notionExecutor.js'
-
-// ─── Executor registry ───────────────────────────────────────────────────────
-// Key = node.type (as stored in React Flow / WorkflowData)
-// Value = executor module exporting execute(node, context)
-const executors = {
-  trigger: triggerExecutor,
-  github: githubExecutor,
-  slack: slackExecutor,
-  jira: jiraExecutor,
-  notion: notionExecutor,
-}
+import { backendBindings } from '../../../registry/bindings.js'
 
 /**
  * Dispatch a single node to its executor.
@@ -48,13 +33,14 @@ export async function dispatch(node, context) {
   console.log(`[EXEC-TRACE] [nodeDispatcher]   Node data keys: ${node.data ? Object.keys(node.data).join(', ') : 'NO DATA'}`)
   console.log(`[EXEC-TRACE] [nodeDispatcher]   Node data: ${JSON.stringify(node.data)}`)
 
-  const executor = executors[node.type]
+  const executor = backendBindings.getExecutor(node.type)
 
   if (!executor) {
-    console.log(`[EXEC-TRACE] [nodeDispatcher]   ✘ No executor for type "${node.type}" — registered: ${Object.keys(executors).join(', ')}`)
+    const registered = backendBindings.getRegisteredTypeIds()
+    console.log(`[EXEC-TRACE] [nodeDispatcher]   ✘ No executor for type "${node.type}" — registered: ${registered.join(', ')}`)
     throw new Error(
       `No executor registered for node type "${node.type}" (node ${node.id}). ` +
-      `Registered types: ${Object.keys(executors).join(', ')}`
+      `Registered types: ${registered.join(', ')}`
     )
   }
 
@@ -82,5 +68,5 @@ export async function dispatch(node, context) {
  * @returns {string[]}
  */
 export function getRegisteredTypes() {
-  return Object.keys(executors)
+  return backendBindings.getRegisteredTypeIds()
 }

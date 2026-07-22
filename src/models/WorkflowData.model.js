@@ -1,4 +1,5 @@
 import mongoose from 'mongoose'
+import { backendBindings } from '../registry/bindings.js'
 
 // ─── Node schema ─────────────────────────────────────────────────────────────
 const nodeSchema = new mongoose.Schema(
@@ -7,7 +8,7 @@ const nodeSchema = new mongoose.Schema(
     type: {
       type: String,
       required: true,
-      enum: ['trigger', 'github', 'slack', 'jira', 'notion'],
+      enum: backendBindings.getValidSchemaTypeIds(),
     },
     position: {
       x: { type: Number, required: true },

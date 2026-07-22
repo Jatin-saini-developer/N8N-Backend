@@ -1,4 +1,5 @@
 import mongoose from 'mongoose'
+import { backendBindings } from '../registry/bindings.js'
 
 // ─── ExecutionStep sub-schema ─────────────────────────────────────────────────
 const executionStepSchema = new mongoose.Schema(
@@ -9,7 +10,9 @@ const executionStepSchema = new mongoose.Schema(
     },
     nodeType: {
       type: String,
-      enum: ['trigger', 'github', 'slack', 'jira', 'notion'],
+      // Registry-derived — same source as WorkflowData.model.js and workflowValidator.js.
+      // Adding a new node type to the shared registry propagates here automatically.
+      enum: backendBindings.getValidSchemaTypeIds(),
       required: true,
     },
     status: {

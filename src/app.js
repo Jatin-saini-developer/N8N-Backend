@@ -4,7 +4,6 @@ import helmet from 'helmet'
 import morgan from 'morgan'
 import rateLimit from 'express-rate-limit'
 import logger from './config/logger.js'
-import integrationsRoutes from './modules/integrations/integrationsRoutes.js'
 
 
 const app = express()
@@ -53,6 +52,7 @@ app.get('/health', (req, res) => {
 // ─── Routes ──────────────────────────────────────────────────────────
 import authRoutes from './modules/authRoutes.js'
 import workflowRoutes from './modules/workflow/workflowRoutes.js'
+import integrationsRoutes from './modules/integrations/integrationsRoutes.js'
 
 app.use('/api/v1/auth', authRoutes)
 app.use('/api/v1/workflows', workflowRoutes)
